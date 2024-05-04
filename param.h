@@ -1,5 +1,5 @@
 #define NPROC        64  // maximum number of processes
-#define NLEVEL        1  // number of scheduler priority levels
+#define NLEVEL        3  // number of scheduler priority levels
 #define NNODE        (NLEVEL+1)       // number of sentinel nodes in process list
 #define KSTACKSIZE 4096  // size of per-process kernel stack
 #define NCPU          8  // maximum number of CPUs
