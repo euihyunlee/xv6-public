@@ -358,6 +358,8 @@ wait(void)
 void
 scheduler(void)
 {
+  struct pnode *tail;
+  struct pnode *tmp;
   struct pnode *pnode;
   struct proc *p;
   struct cpu *c = mycpu();
@@ -369,12 +371,29 @@ scheduler(void)
 
     // Loop over process table looking for process to run.
     acquire(&ptable.lock);
+    tail = ptable.node;
     for(pnode = ptable.node; pnode; pnode = pnode->next){
-      if(pnode->sntnl)
+      if(pnode->sntnl){
+        tail++;
         continue;
+      }
       p = &pnode->p;
       if(p->state != RUNNABLE)
         continue;
+
+      // Demote process if time slice has been exhausted.
+      if(p->ticks == TSLICE && tail != &ptable.node[NLEVEL]){
+        p->ticks = 0;
+        tmp = pnode->prev;
+        remove(pnode);
+        insert_before(tail + 1, pnode);
+        pnode = tmp;
+        continue;
+      }
+
+      p->ticks = 0;
+      remove(pnode);
+      insert_before(tail, pnode);
 
       // Switch to chosen process.  It is the process's job
       // to release ptable.lock and then reacquire it
@@ -389,6 +408,7 @@ scheduler(void)
       // Process is done running for now.
       // It should have changed its p->state before coming back.
       c->proc = 0;
+      break;
     }
     release(&ptable.lock);
 
