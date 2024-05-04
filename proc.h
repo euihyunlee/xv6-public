@@ -50,6 +50,7 @@ struct proc {
   struct inode *cwd;           // Current directory
   char name[16];               // Process name (debugging)
   int nice;                    // Scheduling priority niceness
+  int ticks;                   // Ticks spent running
 };
 
 // Per-process node

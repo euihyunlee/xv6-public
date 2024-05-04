@@ -113,7 +113,8 @@ trap(struct trapframe *tf)
     acquire(&wokelock);
     xwoke = woke;
     release(&wokelock);
-    if(xwoke)
+    myproc()->ticks++;
+    if(xwoke || myproc()->ticks == TSLICE)
       yield();
   }
 

@@ -160,6 +160,7 @@ userinit(void)
   p->cwd = namei("/");
 
   p->nice = 2;
+  p->ticks = 0;
 
   // this assignment to p->state lets other cores
   // run this process. the acquire forces the above
@@ -216,6 +217,7 @@ fork(void)
     return -1;
   }
   np->nice = curproc->nice;
+  np->ticks = 0;
   np->sz = curproc->sz;
   np->parent = curproc;
   *np->tf = *curproc->tf;
