@@ -495,13 +495,22 @@ wakeup1(void *chan)
 {
   struct pnode *pnode;
   struct proc *p;
+  uint dirty;
 
+  dirty = 0;
   for(pnode = ptable.node; pnode; pnode = pnode->next){
     if(pnode->sntnl)
       continue;
     p = &pnode->p;
-    if(p->state == SLEEPING && p->chan == chan)
+    if(p->state == SLEEPING && p->chan == chan){
       p->state = RUNNABLE;
+      dirty = 1;
+    }
+  }
+  if(dirty && myproc()){
+    acquire(&wokelock);
+    woke = 1;
+    release(&wokelock);
   }
 }
 
