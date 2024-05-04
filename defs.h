@@ -4,6 +4,7 @@ struct file;
 struct inode;
 struct pipe;
 struct proc;
+struct pnode;
 struct rtcdate;
 struct spinlock;
 struct sleeplock;
@@ -100,6 +101,11 @@ int             pipealloc(struct file**, struct file**);
 void            pipeclose(struct pipe*, int);
 int             piperead(struct pipe*, char*, int);
 int             pipewrite(struct pipe*, char*, int);
+
+// pnode.c
+void            insert_after(struct pnode*, struct pnode*);
+void            insert_before(struct pnode*, struct pnode*);
+void            remove(struct pnode*);
 
 //PAGEBREAK: 16
 // proc.c

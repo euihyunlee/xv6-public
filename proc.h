@@ -52,6 +52,14 @@ struct proc {
   int nice;                    // Scheduling priority niceness
 };
 
+// Per-process node
+struct pnode {
+  struct proc p;               // Per-process state
+  struct pnode *prev;          // Previous node
+  struct pnode *next;          // Next node
+  int sntnl;                   // If non-zero, is sentinel node
+};
+
 // Process memory is laid out contiguously, low addresses first:
 //   text
 //   original data and bss

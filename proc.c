@@ -9,7 +9,8 @@
 
 struct {
   struct spinlock lock;
-  struct proc proc[NPROC];
+  struct pnode proc[NPROC];
+  struct pnode node[NNODE];
 } ptable;
 
 static struct proc *initproc;
@@ -23,6 +24,16 @@ static void wakeup1(void *chan);
 void
 pinit(void)
 {
+  struct pnode *pnode;
+  struct pnode *prev;
+
+  ptable.node->sntnl = 1;
+  prev = ptable.node;
+  for(pnode = &ptable.node[1]; pnode < &ptable.node[NNODE]; pnode++){
+    pnode->sntnl = 1;
+    insert_after(prev, pnode);
+    prev = pnode;
+  }
   initlock(&ptable.lock, "ptable");
 }
 
@@ -73,14 +84,17 @@ myproc(void) {
 static struct proc*
 allocproc(void)
 {
+  struct pnode *pnode;
   struct proc *p;
   char *sp;
 
   acquire(&ptable.lock);
 
-  for(p = ptable.proc; p < &ptable.proc[NPROC]; p++)
+  for(pnode = ptable.proc; pnode < &ptable.proc[NPROC]; pnode++){
+    p = &pnode->p;
     if(p->state == UNUSED)
       goto found;
+  }
 
   release(&ptable.lock);
   return 0;
@@ -88,6 +102,9 @@ allocproc(void)
 found:
   p->state = EMBRYO;
   p->pid = nextpid++;
+
+  // Enqueue pnode at first priority queue
+  insert_before(&ptable.node[1], pnode);
 
   release(&ptable.lock);
 
@@ -230,6 +247,7 @@ fork(void)
 void
 exit(void)
 {
+  struct pnode *pnode;
   struct proc *curproc = myproc();
   struct proc *p;
   int fd;
@@ -256,7 +274,10 @@ exit(void)
   wakeup1(curproc->parent);
 
   // Pass abandoned children to init.
-  for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
+  for(pnode = ptable.node; pnode; pnode = pnode->next){
+    if(pnode->sntnl)
+      continue;
+    p = &pnode->p;
     if(p->parent == curproc){
       p->parent = initproc;
       if(p->state == ZOMBIE)
@@ -275,6 +296,7 @@ exit(void)
 int
 wait(void)
 {
+  struct pnode *pnode;
   struct proc *p;
   int havekids, pid;
   struct proc *curproc = myproc();
@@ -283,7 +305,10 @@ wait(void)
   for(;;){
     // Scan through table looking for exited children.
     havekids = 0;
-    for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
+    for(pnode = ptable.node; pnode; pnode = pnode->next){
+      if(pnode->sntnl)
+        continue;
+      p = &pnode->p;
       if(p->parent != curproc)
         continue;
       havekids = 1;
@@ -298,6 +323,10 @@ wait(void)
         p->name[0] = 0;
         p->killed = 0;
         p->state = UNUSED;
+
+        // Remove pnode from used process list
+        remove(pnode);
+
         release(&ptable.lock);
         return pid;
       }
@@ -325,6 +354,7 @@ wait(void)
 void
 scheduler(void)
 {
+  struct pnode *pnode;
   struct proc *p;
   struct cpu *c = mycpu();
   c->proc = 0;
@@ -335,7 +365,10 @@ scheduler(void)
 
     // Loop over process table looking for process to run.
     acquire(&ptable.lock);
-    for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
+    for(pnode = ptable.node; pnode; pnode = pnode->next){
+      if(pnode->sntnl)
+        continue;
+      p = &pnode->p;
       if(p->state != RUNNABLE)
         continue;
 
@@ -460,11 +493,16 @@ sleep(void *chan, struct spinlock *lk)
 static void
 wakeup1(void *chan)
 {
+  struct pnode *pnode;
   struct proc *p;
 
-  for(p = ptable.proc; p < &ptable.proc[NPROC]; p++)
+  for(pnode = ptable.node; pnode; pnode = pnode->next){
+    if(pnode->sntnl)
+      continue;
+    p = &pnode->p;
     if(p->state == SLEEPING && p->chan == chan)
       p->state = RUNNABLE;
+  }
 }
 
 // Wake up all processes sleeping on chan.
@@ -482,10 +520,14 @@ wakeup(void *chan)
 int
 kill(int pid)
 {
+  struct pnode *pnode;
   struct proc *p;
 
   acquire(&ptable.lock);
-  for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
+  for(pnode = ptable.node; pnode; pnode = pnode->next){
+    if(pnode->sntnl)
+      continue;
+    p = &pnode->p;
     if(p->pid == pid){
       p->killed = 1;
       // Wake process from sleep if necessary.
@@ -515,11 +557,15 @@ procdump(void)
   [ZOMBIE]    "zombie"
   };
   int i;
+  struct pnode *pnode;
   struct proc *p;
   char *state;
   uint pc[10];
 
-  for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
+  for(pnode = ptable.node; pnode; pnode = pnode->next){
+    if(pnode->sntnl)
+      continue;
+    p = &pnode->p;
     if(p->state == UNUSED)
       continue;
     if(p->state >= 0 && p->state < NELEM(states) && states[p->state])
