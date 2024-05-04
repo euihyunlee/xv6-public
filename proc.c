@@ -235,6 +235,8 @@ fork(void)
   acquire(&ptable.lock);
 
   np->state = RUNNABLE;
+  curproc->state = RUNNABLE;
+  sched();
 
   release(&ptable.lock);
 
