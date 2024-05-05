@@ -412,6 +412,9 @@ sched(void)
     panic("sched running");
   if(readeflags()&FL_IF)
     panic("sched interruptible");
+  acquire(&wokelock);
+  woke = 0;
+  release(&wokelock);
   intena = mycpu()->intena;
   swtch(&p->context, mycpu()->scheduler);
   mycpu()->intena = intena;

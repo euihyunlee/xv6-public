@@ -112,7 +112,6 @@ trap(struct trapframe *tf)
      tf->trapno == T_IRQ0+IRQ_TIMER){
     acquire(&wokelock);
     xwoke = woke;
-    woke = 0;
     release(&wokelock);
     if(xwoke)
       yield();
