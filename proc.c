@@ -356,9 +356,10 @@ scheduler(void)
 {
   struct pnode *pnode;
   struct proc *p;
+  struct proc *q;
   struct cpu *c = mycpu();
   c->proc = 0;
-  
+
   for(;;){
     // Enable interrupts on this processor.
     sti();
@@ -369,25 +370,37 @@ scheduler(void)
       if(pnode->sntnl)
         continue;
       p = &pnode->p;
-      if(p->state != RUNNABLE)
-        continue;
-
-      // Switch to chosen process.  It is the process's job
-      // to release ptable.lock and then reacquire it
-      // before jumping back to us.
-      c->proc = p;
-      switchuvm(p);
-      p->state = RUNNING;
-
-      swtch(&(c->scheduler), p->context);
-      switchkvm();
-
-      // Process is done running for now.
-      // It should have changed its p->state before coming back.
-      c->proc = 0;
+      if(p->state == RUNNABLE)
+        break;
     }
-    release(&ptable.lock);
+    if(!pnode){
+      release(&ptable.lock);
+      continue;
+    }
+    for(pnode = pnode->next; pnode; pnode = pnode->next){
+      if(pnode->sntnl)
+        continue;
+      q = &pnode->p;
+      if(q->state != RUNNABLE)
+        continue;
+      if(q->nice < p->nice || (q->nice == p->nice && q->pid < p->pid))
+        p = q;
+    }
 
+    // Switch to chosen process.  It is the process's job
+    // to release ptable.lock and then reacquire it
+    // before jumping back to us.
+    c->proc = p;
+    switchuvm(p);
+    p->state = RUNNING;
+
+    swtch(&(c->scheduler), p->context);
+    switchkvm();
+
+    // Process is done running for now.
+    // It should have changed its p->state before coming back.
+    c->proc = 0;
+    release(&ptable.lock);
   }
 }
 
