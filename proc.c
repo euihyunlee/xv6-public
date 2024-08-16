@@ -142,6 +142,8 @@ userinit(void)
   safestrcpy(p->name, "initcode", sizeof(p->name));
   p->cwd = namei("/");
 
+  p->nice = 2;
+
   // this assignment to p->state lets other cores
   // run this process. the acquire forces the above
   // writes to be visible, and the lock is also needed
@@ -196,6 +198,7 @@ fork(void)
     np->state = UNUSED;
     return -1;
   }
+  np->nice = curproc->nice;
   np->sz = curproc->sz;
   np->parent = curproc;
   *np->tf = *curproc->tf;
@@ -531,4 +534,28 @@ procdump(void)
     }
     cprintf("\n");
   }
+}
+
+// Add value to niceness of process.
+// Attempts to set niceness to a value less than -5
+// or a value greater than 4 are clamped.
+int
+nice(int value)
+{
+  struct proc *curproc = myproc();
+  int new_nice;
+
+  acquire(&ptable.lock);
+  if (value > 9)
+    new_nice = 4;
+  else if (value < -9)
+    new_nice = -5;
+  else {
+    new_nice = curproc->nice + value;
+    new_nice = (new_nice > 4) ? 4 : ((new_nice < -5) ? -5 : new_nice);
+  }
+  curproc->nice = new_nice;
+  release(&ptable.lock);
+
+  return new_nice;
 }

@@ -96,3 +96,13 @@ sys_yield(void)
   yield();
   return 0;
 }
+
+int
+sys_nice(void)
+{
+  int value;
+
+  if (argint(0, &value) < 0)
+    return myproc()->nice;
+  return nice(value);
+}
