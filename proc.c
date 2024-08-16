@@ -601,6 +601,8 @@ nice(int value)
     new_nice = (new_nice > 4) ? 4 : ((new_nice < -5) ? -5 : new_nice);
   }
   curproc->nice = new_nice;
+  curproc->state = RUNNABLE;
+  sched();
   release(&ptable.lock);
 
   return new_nice;
